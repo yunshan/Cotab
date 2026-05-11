@@ -7,7 +7,13 @@ import {
   sortActiveTabs
 } from '../lib/tabRules';
 import { subscribeToDashboardState } from '../lib/storage';
-import { DEFAULT_SETTINGS, type DashboardState, type StagedRecord, type StoredTab } from '../lib/types';
+import {
+  DEFAULT_SETTINGS,
+  type DashboardState,
+  type HistoryRecord,
+  type StagedRecord,
+  type StoredTab
+} from '../lib/types';
 import { getDefaultLanguage, type Language } from './preferences';
 import { truncateTitle } from './text';
 
@@ -22,7 +28,7 @@ const labels = {
     switchLanguage: 'Switch to English',
     active: '活跃',
     activeCloseAll: (count: number) => `× 关闭全部 ${count} 个标签页`,
-    activeDetail: '按激活次数排序的打开标签页。',
+    activeDetail: '按最近 24 小时激活次数排序的打开标签页。',
     activeEmpty: '当前还没有被追踪的网页标签页。',
     activeEmptySearch: '没有匹配搜索的活跃标签页。',
     staged: '暂存',
@@ -30,18 +36,25 @@ const labels = {
     stagedDetail: '临时存放，供后续处理。',
     stagedEmpty: 'Stage 后的标签页会出现在这里。',
     stagedEmptySearch: '没有匹配搜索的暂存项。',
+    history: '历史',
+    historyDetail: '搜索 Chrome 历史记录中未出现在活跃和暂存里的网页。',
+    historyEmpty: '没有新的历史记录匹配当前搜索。',
+    historyLoading: '正在搜索历史记录...',
     tabFocused: '已跳转到标签页',
     tabsStaged: (count: number) => `${count} 个标签页已暂存`,
     tabsClosed: (count: number) => `${count} 个标签页已关闭`,
     stagedRestored: '已恢复暂存标签页',
     stagedRemoved: '已移除暂存项',
+    historyOpened: '已打开历史记录',
     tabsRefreshed: '标签页已刷新',
     refresh: '刷新',
     storeTip: '稍后处理',
     closeTip: '关闭标签页',
     restoreTip: '恢复标签页',
     removeTip: '移除暂存项',
-    activations: '次激活'
+    activations: '次激活',
+    activationTip: '最近 24 小时Tab 激活次数',
+    visits: '次访问'
   },
   en: {
     searchAria: 'Search tabs and staged items',
@@ -51,7 +64,7 @@ const labels = {
     switchLanguage: '切换到中文',
     active: 'Active',
     activeCloseAll: (count: number) => `× Close all ${count} tabs`,
-    activeDetail: 'Open tabs ranked by activation count.',
+    activeDetail: 'Open tabs ranked by activations in the last 24 hours.',
     activeEmpty: 'No active web tabs are being tracked yet.',
     activeEmptySearch: 'No active tab matches that search.',
     staged: 'Staged',
@@ -59,18 +72,25 @@ const labels = {
     stagedDetail: 'Temporarily stored links for later use.',
     stagedEmpty: 'Staged tabs will appear here.',
     stagedEmptySearch: 'No staged item matches that search.',
+    history: 'History',
+    historyDetail: 'Chrome history results not already shown in Active or Staged.',
+    historyEmpty: 'No new history result matches that search.',
+    historyLoading: 'Searching history...',
     tabFocused: 'Tab focused',
     tabsStaged: (count: number) => `${count} tab${count === 1 ? '' : 's'} staged`,
     tabsClosed: (count: number) => `${count} tab${count === 1 ? '' : 's'} closed`,
     stagedRestored: 'Staged tab restored',
     stagedRemoved: 'Staged item removed',
+    historyOpened: 'History result opened',
     tabsRefreshed: 'Tabs refreshed',
     refresh: 'Refresh',
     storeTip: 'Store for later use',
     closeTip: 'Close tab',
     restoreTip: 'Restore tab',
     removeTip: 'Remove staged item',
-    activations: 'activations'
+    activations: 'activations',
+    activationTip: 'Tab activations in the last 24 hours',
+    visits: 'visits'
   }
 } satisfies Record<Language, Record<string, unknown>>;
 
@@ -278,6 +298,8 @@ const emptyState: DashboardState = {
 export function App() {
   const [state, setState] = useState<DashboardState>(emptyState);
   const [query, setQuery] = useState('');
+  const [historyResults, setHistoryResults] = useState<HistoryRecord[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const [status, setStatus] = useState('Ready');
   const [theme, setTheme] = useState<Theme>(() => {
@@ -341,6 +363,50 @@ export function App() {
     () => searchStaged(state.staged, query),
     [query, state.staged]
   );
+  const excludedHistoryUrls = useMemo(
+    () => [...activeTabsRaw.map((tab) => tab.url), ...state.staged.map((record) => record.url)],
+    [activeTabsRaw, state.staged]
+  );
+
+  useEffect(() => {
+    const normalized = query.trim();
+    if (!normalized) {
+      setHistoryResults([]);
+      setIsHistoryLoading(false);
+      return;
+    }
+
+    let isCancelled = false;
+    setIsHistoryLoading(true);
+
+    const timeoutId = window.setTimeout(() => {
+      sendDashboardMessage({
+        type: 'searchHistory',
+        query: normalized,
+        excludeUrls: excludedHistoryUrls
+      })
+        .then((response) => {
+          if (!isCancelled) {
+            setHistoryResults(response.ok ? response.history ?? [] : []);
+          }
+        })
+        .catch(() => {
+          if (!isCancelled) {
+            setHistoryResults([]);
+          }
+        })
+        .finally(() => {
+          if (!isCancelled) {
+            setIsHistoryLoading(false);
+          }
+        });
+    }, 160);
+
+    return () => {
+      isCancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [excludedHistoryUrls, query]);
 
   async function stageTabs(tabIds: number[]) {
     if (!tabIds.length) {
@@ -459,6 +525,7 @@ export function App() {
             tabs={activeTabs}
             labels={{
               activations: text.activations as string,
+              activationTip: text.activationTip as string,
               storeTip: text.storeTip as string,
               closeTip: text.closeTip as string
             }}
@@ -514,6 +581,29 @@ export function App() {
               )
             }
           />
+
+          {query.trim() ? (
+            <HistoryList
+              title={text.history as string}
+              detail={text.historyDetail as string}
+              count={historyResults.length}
+              emptyText={
+                (isHistoryLoading ? text.historyLoading : text.historyEmpty) as string
+              }
+              records={isHistoryLoading ? [] : historyResults}
+              labels={{
+                visits: text.visits as string
+              }}
+              onOpen={(record) =>
+                runMessage(
+                  { type: 'openHistoryUrl', url: record.url },
+                  setIsBusy,
+                  setStatus,
+                  text.historyOpened as string
+                )
+              }
+            />
+          ) : null}
         </section>
       </div>
 
@@ -604,6 +694,7 @@ function TabList({
   emptyText: string;
   labels: {
     activations: string;
+    activationTip: string;
     storeTip: string;
     closeTip: string;
   };
@@ -624,7 +715,12 @@ function TabList({
             <button className="title-link" onClick={() => onTitleClick(tab)}>
               {truncateTitle(tab.title)}
             </button>
-            <span>{tab.domain} · {tab.activationCount} {labels.activations}</span>
+            <span>
+              {tab.domain} ·{' '}
+              <span className="activation-count" title={labels.activationTip}>
+                {tab.activationCount} {labels.activations}
+              </span>
+            </span>
           </div>
           <span className="time-label">{formatRelativeTime(tab.lastAccessedAt)}</span>
           <div className="row-actions">
@@ -703,6 +799,52 @@ function StagedList({
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function HistoryList({
+  title,
+  detail,
+  count,
+  records,
+  emptyText,
+  labels,
+  onOpen
+}: {
+  title: string;
+  detail: string;
+  count: number;
+  records: HistoryRecord[];
+  emptyText: string;
+  labels: {
+    visits: string;
+  };
+  onOpen: (record: HistoryRecord) => void;
+}) {
+  return (
+    <div className="history-block">
+      <SectionHeader title={title} count={count} detail={detail} />
+      {records.length ? (
+        <div className="tab-list">
+          {records.map((record) => (
+            <div className="tab-row history-row" key={record.id}>
+              <Favicon src={record.favIconUrl} url={record.url} domain={record.domain} />
+              <div className="row-copy">
+                <button className="title-link" onClick={() => onOpen(record)}>
+                  {truncateTitle(record.title)}
+                </button>
+                <span>
+                  {record.domain} · {record.visitCount} {labels.visits}
+                </span>
+              </div>
+              <span className="time-label">{formatRelativeTime(record.lastVisitTime)}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="empty-state">{emptyText}</p>
+      )}
     </div>
   );
 }

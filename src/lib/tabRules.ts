@@ -1,6 +1,8 @@
-import type { StagedRecord, StoredTab } from './types';
+import type { HistoryRecord, StagedRecord, StoredTab } from './types';
 
 const HOUR = 60 * 60 * 1000;
+const RECENT_ACTIVATION_WINDOW = 24 * HOUR;
+const ACTIVATION_DEDUPE_WINDOW = 1000;
 
 export function isSupportedPageUrl(url: string): boolean {
   return url.startsWith('http://') || url.startsWith('https://');
@@ -45,6 +47,21 @@ export function sortActiveTabs(tabs: StoredTab[]): StoredTab[] {
       a.title.localeCompare(b.title)
     );
   });
+}
+
+export function getRecentActivationTimestamps(timestamps: number[], now: number): number[] {
+  const cutoff = now - RECENT_ACTIVATION_WINDOW;
+  return timestamps.filter((timestamp) => timestamp >= cutoff && timestamp <= now);
+}
+
+export function recordRecentActivation(timestamps: number[], now: number): number[] {
+  const recent = getRecentActivationTimestamps(timestamps, now);
+  const latest = recent.at(-1);
+  if (latest && now - latest < ACTIVATION_DEDUPE_WINDOW) {
+    return recent;
+  }
+
+  return [...recent, now];
 }
 
 export function stageTabRecords(
@@ -100,6 +117,54 @@ export function searchTabs(tabs: StoredTab[], query: string): StoredTab[] {
       .toLowerCase()
       .includes(normalized);
   });
+}
+
+export function filterHistoryRecords(
+  records: HistoryRecord[],
+  query: string,
+  excludeUrls: string[]
+): HistoryRecord[] {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) {
+    return [];
+  }
+
+  const excluded = new Set(excludeUrls.map(normalizeComparableUrl).filter(Boolean));
+  const seen = new Set<string>();
+  const filtered: HistoryRecord[] = [];
+
+  for (const record of records) {
+    const normalizedUrl = normalizeComparableUrl(record.url);
+    if (!normalizedUrl || excluded.has(normalizedUrl) || seen.has(normalizedUrl)) {
+      continue;
+    }
+
+    const matches = [record.title, record.url, record.domain]
+      .join(' ')
+      .toLowerCase()
+      .includes(normalizedQuery);
+
+    if (matches) {
+      seen.add(normalizedUrl);
+      filtered.push(record);
+    }
+  }
+
+  return filtered;
+}
+
+export function normalizeComparableUrl(url: string): string {
+  if (!isSupportedPageUrl(url)) {
+    return '';
+  }
+
+  try {
+    const parsed = new URL(url);
+    parsed.hash = '';
+    return parsed.toString();
+  } catch {
+    return '';
+  }
 }
 
 function makeStagedId(url: string, stagedAt: number): string {

@@ -10,23 +10,24 @@ If your browser regularly grows into dozens or hundreds of tabs, closing them ca
 
 ## Highlights
 
-- **Active tabs by real usage**: open tabs are ranked by activation count, so frequently used tabs rise naturally.
+- **Active tabs by recent usage**: open tabs are ranked by activation count from the last 24 hours, so currently useful pages rise naturally.
 - **Stage instead of hoard**: store a tab for later use and close the original tab in one click.
 - **Close without ceremony**: close individual tabs or bulk-close the currently visible Active list.
 - **Focused two-pane layout**: Active takes the main workspace, while Staged sits beside it as a temporary holding area.
 - **Search as you type**: filter Active and Staged tabs by title, URL, or domain.
+- **History search when needed**: while searching, Cotab can surface matching Chrome history results that are not already visible in Active or Staged.
 - **Consistent favicons**: Cotab prefers each site's normal favicon so discarded Chrome tabs do not appear as washed-out duplicates.
 - **Bilingual interface**: Chinese and English modes, defaulting to the browser or system language.
 - **Light and dark themes**: quiet theme controls with local preference storage.
-- **Private by default**: no account, no backend, no page snapshots, no browser history scraping.
+- **Private by default**: no account, no backend, no page snapshots, and no full-history sync or upload.
 
 ## Current Extension Info
 
 - **Name**: Cotab
 - **Manifest**: Chrome Extension Manifest V3
-- **Version**: `0.9.0`
+- **Version**: `1.1.0`
 - **New tab override**: yes
-- **Permissions**: `tabs`, `storage`, `favicon`
+- **Permissions**: `tabs`, `storage`, `favicon`, `history`
 - **Local data**: tab metadata and staged items in `chrome.storage.local`
 - **Icons**:
   - `icons/icon16.png`
@@ -87,6 +88,7 @@ Covered today:
 
 - tab search
 - staged item search
+- history result filtering and Active/Staged exclusion
 - activation-count sorting
 - staging/deduping behavior
 - title truncation
@@ -138,7 +140,9 @@ Cotab stores only local tab metadata needed for the dashboard:
 - last accessed time
 - staged item metadata
 
-Cotab does **not** use an account, backend, cloud sync, analytics, page-content extraction, screenshots, or Chrome browsing history access.
+Cotab does **not** use an account, backend, cloud sync, analytics, page-content extraction, screenshots, or background browsing-history harvesting.
+
+Cotab uses Chrome history only when the user types in the search box, and only to display matching pages that are not already shown in Active or Staged. History search results are not uploaded or synced to any server by Cotab.
 
 ## Project Structure
 

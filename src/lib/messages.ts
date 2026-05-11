@@ -1,3 +1,5 @@
+import type { HistoryRecord } from './types';
+
 export type DashboardMessage =
   | { type: 'stageTabs'; tabIds: number[] }
   | { type: 'closeTabs'; tabIds: number[] }
@@ -5,11 +7,14 @@ export type DashboardMessage =
   | { type: 'deleteStaged'; stagedId: string }
   | { type: 'deleteStagedItems'; stagedIds: string[] }
   | { type: 'focusTab'; tabId: number; windowId: number }
-  | { type: 'refreshTabs' };
+  | { type: 'refreshTabs' }
+  | { type: 'searchHistory'; query: string; excludeUrls: string[] }
+  | { type: 'openHistoryUrl'; url: string };
 
 export interface DashboardMessageResponse {
   ok: boolean;
   error?: string;
+  history?: HistoryRecord[];
 }
 
 export function sendDashboardMessage(

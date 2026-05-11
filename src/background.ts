@@ -1,7 +1,14 @@
-import { getDomain, isSupportedPageUrl, stageTabRecords } from './lib/tabRules';
+import {
+  filterHistoryRecords,
+  getDomain,
+  getRecentActivationTimestamps,
+  isSupportedPageUrl,
+  recordRecentActivation,
+  stageTabRecords
+} from './lib/tabRules';
 import { getDashboardState, saveDashboardState } from './lib/storage';
 import type { DashboardMessage, DashboardMessageResponse } from './lib/messages';
-import type { StoredTab } from './lib/types';
+import type { HistoryRecord, StoredTab } from './lib/types';
 
 chrome.runtime.onInstalled.addListener(() => {
   void refreshOpenTabs();
@@ -32,7 +39,7 @@ chrome.runtime.onMessage.addListener(
     sendResponse: (response: DashboardMessageResponse) => void
   ) => {
     handleMessage(message)
-      .then(() => sendResponse({ ok: true }))
+      .then((response) => sendResponse(response ?? { ok: true }))
       .catch((error: unknown) => {
         sendResponse({
           ok: false,
@@ -44,7 +51,7 @@ chrome.runtime.onMessage.addListener(
   }
 );
 
-async function handleMessage(message: DashboardMessage): Promise<void> {
+async function handleMessage(message: DashboardMessage): Promise<DashboardMessageResponse | void> {
   switch (message.type) {
     case 'stageTabs':
       await stageTabs(message.tabIds);
@@ -69,6 +76,14 @@ async function handleMessage(message: DashboardMessage): Promise<void> {
     case 'refreshTabs':
       await refreshOpenTabs();
       return;
+    case 'searchHistory':
+      return {
+        ok: true,
+        history: await searchHistory(message.query, message.excludeUrls)
+      };
+    case 'openHistoryUrl':
+      await chrome.tabs.create({ url: message.url, active: true });
+      return;
   }
 }
 
@@ -81,9 +96,13 @@ async function refreshOpenTabs(): Promise<void> {
   const tabs = openTabs
     .map((tab) => {
       const existing = existingById.get(tab.id ?? -1);
+      const activationTimestamps = getRecentActivationTimestamps(
+        getStoredActivationTimestamps(existing),
+        now
+      );
       return toStoredTab(tab, {
         lastAccessedAt: existing?.lastAccessedAt ?? now,
-        activationCount: existing?.activationCount ?? 0
+        activationTimestamps
       });
     })
     .filter((tab): tab is StoredTab => Boolean(tab));
@@ -104,11 +123,14 @@ async function upsertTab(
 ): Promise<void> {
   const state = await getDashboardState();
   const existing = state.tabs.find((item) => item.tabId === tabId);
+  const activationTimestamps = incrementActivation
+    ? recordRecentActivation(getStoredActivationTimestamps(existing), lastAccessedAt)
+    : getRecentActivationTimestamps(getStoredActivationTimestamps(existing), lastAccessedAt);
   const stored = toStoredTab(
     { ...tab, id: tabId },
     {
       lastAccessedAt,
-      activationCount: (existing?.activationCount ?? 0) + (incrementActivation ? 1 : 0)
+      activationTimestamps
     }
   );
   if (!stored) {
@@ -178,9 +200,38 @@ async function deleteStagedItems(stagedIds: string[]): Promise<void> {
   });
 }
 
+async function searchHistory(query: string, excludeUrls: string[]): Promise<HistoryRecord[]> {
+  const normalized = query.trim();
+  if (!normalized || !chrome.history?.search) {
+    return [];
+  }
+
+  const items = await chrome.history.search({
+    text: normalized,
+    maxResults: 50,
+    startTime: 0
+  });
+
+  return filterHistoryRecords(items.map(toHistoryRecord), normalized, excludeUrls);
+}
+
+function toHistoryRecord(item: chrome.history.HistoryItem): HistoryRecord {
+  const url = item.url ?? '';
+
+  return {
+    id: item.id,
+    title: item.title || url,
+    url,
+    favIconUrl: '',
+    domain: getDomain(url),
+    lastVisitTime: item.lastVisitTime ?? 0,
+    visitCount: item.visitCount ?? 0
+  };
+}
+
 function toStoredTab(
   tab: chrome.tabs.Tab,
-  activity: { lastAccessedAt: number; activationCount: number }
+  activity: { lastAccessedAt: number; activationTimestamps: number[] }
 ): StoredTab | null {
   if (!tab.id || !tab.windowId || !tab.url || !isSupportedPageUrl(tab.url)) {
     return null;
@@ -194,8 +245,13 @@ function toStoredTab(
     favIconUrl: tab.favIconUrl ?? '',
     domain: getDomain(tab.url),
     lastAccessedAt: activity.lastAccessedAt,
-    activationCount: activity.activationCount,
+    activationCount: activity.activationTimestamps.length,
+    activationTimestamps: activity.activationTimestamps,
     pinned: Boolean(tab.pinned),
     audible: Boolean(tab.audible)
   };
+}
+
+function getStoredActivationTimestamps(tab: StoredTab | undefined): number[] {
+  return Array.isArray(tab?.activationTimestamps) ? tab.activationTimestamps : [];
 }

@@ -492,6 +492,20 @@ h1 {
   grid-template-columns: 24px minmax(0, 1fr) max-content max-content;
 }
 
+.history-block {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--hairline-soft);
+}
+
+.history-block .section-header {
+  margin-bottom: 14px;
+}
+
+.history-row {
+  grid-template-columns: 24px minmax(0, 1fr) max-content;
+}
+
 .favicon {
   width: 20px;
   height: 20px;
@@ -512,13 +526,17 @@ h1 {
   min-width: 0;
 }
 
-.row-copy span {
+.row-copy > span {
   font-size: 12px;
   line-height: 1.35;
 }
 
+.activation-count {
+  cursor: help;
+}
+
 .row-copy strong,
-.row-copy span {
+.row-copy > span {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -787,7 +805,8 @@ h1 {
   }
 
   .tab-row,
-  .staged-row {
+  .staged-row,
+  .history-row {
     grid-template-columns: 24px minmax(0, 1fr);
   }
 

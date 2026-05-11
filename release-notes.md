@@ -1,5 +1,25 @@
 # Cotab Release Notes
 
+## v1.1.0 - 2026-05-11
+
+This release makes Active ranking more current and easier to understand.
+
+- Changed tab activation counting from lifetime accumulation to a rolling last-24-hours window.
+- Stored recent activation timestamps locally and derives each tab's displayed activation count from that window.
+- Added a small hover tooltip on activation-count text explaining that it means tab activations in the last 24 hours.
+- Confirmed the bottom page footer remains `Cotab by yunshan`, with Cotab linking to the GitHub repository.
+
+## v1.0.0 - 2026-05-11
+
+This release extends Cotab search beyond currently open and staged tabs while keeping results quiet and relevant.
+
+- Added Chrome history search results below the Staged table, visible only while the user is actively searching.
+- Excluded URLs already shown in Active or Staged from History results to avoid duplicated rows.
+- Added click-to-open behavior for History result titles, opening the page in a new active tab.
+- Added the `history` permission for user-initiated Chrome history lookup.
+- Added unit coverage for History filtering, duplicate URL handling, unsupported URL exclusion, and Active/Staged URL exclusion.
+- Updated README and extension metadata for the new permission and search behavior.
+
 ## v0.9.0 - 2026-05-11
 
 This release prepares Cotab's local build output and project publishing path for GitHub Releases.

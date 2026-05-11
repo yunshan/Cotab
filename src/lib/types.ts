@@ -7,6 +7,7 @@ export interface StoredTab {
   domain: string;
   lastAccessedAt: number;
   activationCount: number;
+  activationTimestamps: number[];
   pinned: boolean;
   audible: boolean;
 }
@@ -19,6 +20,16 @@ export interface StagedRecord {
   domain: string;
   stagedAt: number;
   sourceWindowId: number;
+}
+
+export interface HistoryRecord {
+  id: string;
+  title: string;
+  url: string;
+  favIconUrl: string;
+  domain: string;
+  lastVisitTime: number;
+  visitCount: number;
 }
 
 export interface DashboardSettings {

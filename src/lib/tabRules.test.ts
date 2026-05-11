@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
   filterInactiveTabs,
+  filterHistoryRecords,
+  getRecentActivationTimestamps,
+  recordRecentActivation,
   searchStaged,
   searchTabs,
   sortActiveTabs
 } from './tabRules';
 import { stageTabRecords } from './tabRules';
-import type { StagedRecord, StoredTab } from './types';
+import type { HistoryRecord, StagedRecord, StoredTab } from './types';
 
 const NOW = Date.parse('2026-05-09T09:00:00+08:00');
 const DAY = 24 * 60 * 60 * 1000;
@@ -21,6 +24,7 @@ function tab(overrides: Partial<StoredTab>): StoredTab {
     domain: 'example.com',
     lastAccessedAt: NOW - DAY - 1,
     activationCount: 0,
+    activationTimestamps: [],
     pinned: false,
     audible: false,
     ...overrides
@@ -54,6 +58,25 @@ describe('sortActiveTabs', () => {
     ];
 
     expect(sortActiveTabs(tabs).map((item) => item.tabId)).toEqual([3, 2, 1]);
+  });
+});
+
+describe('recent activation helpers', () => {
+  it('keeps only activation timestamps from the last 24 hours', () => {
+    expect(getRecentActivationTimestamps([NOW - DAY - 1, NOW - DAY, NOW - 1000], NOW)).toEqual([
+      NOW - DAY,
+      NOW - 1000
+    ]);
+  });
+
+  it('records a new activation and dedupes near-simultaneous activation events', () => {
+    const first = recordRecentActivation([NOW - DAY - 1], NOW);
+    const duplicate = recordRecentActivation(first, NOW + 500);
+    const next = recordRecentActivation(duplicate, NOW + 1500);
+
+    expect(first).toEqual([NOW]);
+    expect(duplicate).toEqual([NOW]);
+    expect(next).toEqual([NOW, NOW + 1500]);
   });
 });
 
@@ -136,5 +159,68 @@ describe('searchTabs', () => {
     expect(searchTabs(tabs, 'claude')).toEqual([tabs[0]]);
     expect(searchTabs(tabs, 'example.com')).toEqual([tabs[1]]);
     expect(searchTabs(tabs, 'missing')).toEqual([]);
+  });
+});
+
+describe('filterHistoryRecords', () => {
+  it('filters history records by query and excludes active or staged URLs', () => {
+    const records: HistoryRecord[] = [
+      {
+        id: '1',
+        title: 'Cotab release',
+        url: 'https://example.com/release',
+        favIconUrl: '',
+        domain: 'example.com',
+        lastVisitTime: NOW,
+        visitCount: 4
+      },
+      {
+        id: '2',
+        title: 'Cotab release with hash',
+        url: 'https://example.com/release#notes',
+        favIconUrl: '',
+        domain: 'example.com',
+        lastVisitTime: NOW - 1,
+        visitCount: 2
+      },
+      {
+        id: '3',
+        title: 'Cotab roadmap',
+        url: 'https://cotab.dev/roadmap',
+        favIconUrl: '',
+        domain: 'cotab.dev',
+        lastVisitTime: NOW - 2,
+        visitCount: 1
+      },
+      {
+        id: '4',
+        title: 'Browser settings',
+        url: 'chrome://extensions',
+        favIconUrl: '',
+        domain: '',
+        lastVisitTime: NOW - 3,
+        visitCount: 1
+      }
+    ];
+
+    const result = filterHistoryRecords(records, 'cotab', ['https://example.com/release']);
+
+    expect(result.map((record) => record.url)).toEqual(['https://cotab.dev/roadmap']);
+  });
+
+  it('returns no records when the search query is empty', () => {
+    const records: HistoryRecord[] = [
+      {
+        id: '1',
+        title: 'Cotab release',
+        url: 'https://example.com/release',
+        favIconUrl: '',
+        domain: 'example.com',
+        lastVisitTime: NOW,
+        visitCount: 4
+      }
+    ];
+
+    expect(filterHistoryRecords(records, ' ', [])).toEqual([]);
   });
 });
