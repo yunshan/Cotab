@@ -6,6 +6,8 @@ Cotab is a calm Chrome new-tab dashboard for people who live with too many tabs 
 
 If your browser regularly grows into dozens or hundreds of tabs, closing them can feel strangely risky: one page took effort to find, another might be useful later, and bookmarks feel too permanent for half-formed work. Cotab turns that mess into a lightweight working table: see what you actually use, stage what you may need later, and close the rest with confidence.
 
+![Cotab dashboard preview](assets/cotab.png)
+
 ## Highlights
 
 - **Active tabs by real usage**: open tabs are ranked by activation count, so frequently used tabs rise naturally.
