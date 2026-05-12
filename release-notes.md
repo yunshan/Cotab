@@ -1,5 +1,13 @@
 # Cotab Release Notes
 
+## v1.4.0 - 2026-05-12
+
+This release fixes recent tab activation counting reliability.
+
+- Serialized dashboard state writes in the background service worker so tab activation updates are not overwritten by nearby tab update, refresh, close, stage, or staged-item mutations.
+- Preserved the recent-24-hour activation window while preventing concurrent Chrome events from losing newly recorded activations.
+- Rebuilt the extension package after the background service worker fix.
+
 ## v1.3.0 - 2026-05-12
 
 This release expands Cotab's design theme picker to cover every imported theme reference.

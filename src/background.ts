@@ -10,6 +10,8 @@ import { getDashboardState, saveDashboardState } from './lib/storage';
 import type { DashboardMessage, DashboardMessageResponse } from './lib/messages';
 import type { HistoryRecord, StoredTab } from './lib/types';
 
+let dashboardStateWriteQueue = Promise.resolve();
+
 chrome.runtime.onInstalled.addListener(() => {
   void refreshOpenTabs();
 });
@@ -88,26 +90,29 @@ async function handleMessage(message: DashboardMessage): Promise<DashboardMessag
 }
 
 async function refreshOpenTabs(): Promise<void> {
-  const state = await getDashboardState();
-  const existingById = new Map(state.tabs.map((tab) => [tab.tabId, tab]));
   const openTabs = await chrome.tabs.query({});
-  const now = Date.now();
 
-  const tabs = openTabs
-    .map((tab) => {
-      const existing = existingById.get(tab.id ?? -1);
-      const activationTimestamps = getRecentActivationTimestamps(
-        getStoredActivationTimestamps(existing),
-        now
-      );
-      return toStoredTab(tab, {
-        lastAccessedAt: existing?.lastAccessedAt ?? now,
-        activationTimestamps
-      });
-    })
-    .filter((tab): tab is StoredTab => Boolean(tab));
+  await mutateDashboardState(async () => {
+    const state = await getDashboardState();
+    const existingById = new Map(state.tabs.map((tab) => [tab.tabId, tab]));
+    const now = Date.now();
 
-  await saveDashboardState({ ...state, tabs });
+    const tabs = openTabs
+      .map((tab) => {
+        const existing = existingById.get(tab.id ?? -1);
+        const activationTimestamps = getRecentActivationTimestamps(
+          getStoredActivationTimestamps(existing),
+          now
+        );
+        return toStoredTab(tab, {
+          lastAccessedAt: existing?.lastAccessedAt ?? now,
+          activationTimestamps
+        });
+      })
+      .filter((tab): tab is StoredTab => Boolean(tab));
+
+    await saveDashboardState({ ...state, tabs });
+  });
 }
 
 async function markTabAccessed(tabId: number, incrementActivation: boolean): Promise<void> {
@@ -121,71 +126,93 @@ async function upsertTab(
   lastAccessedAt: number,
   incrementActivation = false
 ): Promise<void> {
-  const state = await getDashboardState();
-  const existing = state.tabs.find((item) => item.tabId === tabId);
-  const activationTimestamps = incrementActivation
-    ? recordRecentActivation(getStoredActivationTimestamps(existing), lastAccessedAt)
-    : getRecentActivationTimestamps(getStoredActivationTimestamps(existing), lastAccessedAt);
-  const stored = toStoredTab(
-    { ...tab, id: tabId },
-    {
-      lastAccessedAt,
-      activationTimestamps
+  await mutateDashboardState(async () => {
+    const state = await getDashboardState();
+    const existing = state.tabs.find((item) => item.tabId === tabId);
+    const activationTimestamps = incrementActivation
+      ? recordRecentActivation(getStoredActivationTimestamps(existing), lastAccessedAt)
+      : getRecentActivationTimestamps(getStoredActivationTimestamps(existing), lastAccessedAt);
+    const stored = toStoredTab(
+      { ...tab, id: tabId },
+      {
+        lastAccessedAt,
+        activationTimestamps
+      }
+    );
+    if (!stored) {
+      await saveDashboardState({
+        ...state,
+        tabs: state.tabs.filter((item) => item.tabId !== tabId)
+      });
+      return;
     }
-  );
-  if (!stored) {
-    await removeStoredTab(tabId);
-    return;
-  }
 
-  const others = state.tabs.filter((item) => item.tabId !== tabId);
-  await saveDashboardState({ ...state, tabs: [...others, stored] });
+    const others = state.tabs.filter((item) => item.tabId !== tabId);
+    await saveDashboardState({ ...state, tabs: [...others, stored] });
+  });
 }
 
 async function removeStoredTab(tabId: number): Promise<void> {
-  const state = await getDashboardState();
-  await saveDashboardState({
-    ...state,
-    tabs: state.tabs.filter((tab) => tab.tabId !== tabId)
+  await mutateDashboardState(async () => {
+    const state = await getDashboardState();
+    await saveDashboardState({
+      ...state,
+      tabs: state.tabs.filter((tab) => tab.tabId !== tabId)
+    });
   });
 }
 
 async function stageTabs(tabIds: number[]): Promise<void> {
-  const state = await getDashboardState();
-  const tabsToStage = state.tabs.filter((tab) => tabIds.includes(tab.tabId));
-  const staged = stageTabRecords(state.staged, tabsToStage, Date.now());
+  const tabsToStage = await mutateDashboardState(async () => {
+    const state = await getDashboardState();
+    const matchingTabs = state.tabs.filter((tab) => tabIds.includes(tab.tabId));
+    const staged = stageTabRecords(state.staged, matchingTabs, Date.now());
 
-  await saveDashboardState({
-    ...state,
-    tabs: state.tabs.filter((tab) => !tabIds.includes(tab.tabId)),
-    staged
+    await saveDashboardState({
+      ...state,
+      tabs: state.tabs.filter((tab) => !tabIds.includes(tab.tabId)),
+      staged
+    });
+
+    return matchingTabs;
   });
 
   await chrome.tabs.remove(tabsToStage.map((tab) => tab.tabId));
 }
 
 async function closeTabs(tabIds: number[]): Promise<void> {
-  const state = await getDashboardState();
-  await saveDashboardState({
-    ...state,
-    tabs: state.tabs.filter((tab) => !tabIds.includes(tab.tabId))
+  await mutateDashboardState(async () => {
+    const state = await getDashboardState();
+    await saveDashboardState({
+      ...state,
+      tabs: state.tabs.filter((tab) => !tabIds.includes(tab.tabId))
+    });
   });
 
   await chrome.tabs.remove(tabIds);
 }
 
 async function restoreStaged(stagedId: string): Promise<void> {
-  const state = await getDashboardState();
-  const record = state.staged.find((item) => item.id === stagedId);
+  const record = await mutateDashboardState(async () => {
+    const state = await getDashboardState();
+    const stagedRecord = state.staged.find((item) => item.id === stagedId);
+    if (!stagedRecord) {
+      throw new Error('Staged record not found');
+    }
+
+    await saveDashboardState({
+      ...state,
+      staged: state.staged.filter((item) => item.id !== stagedId)
+    });
+
+    return stagedRecord;
+  });
+
   if (!record) {
     throw new Error('Staged record not found');
   }
 
   await chrome.tabs.create({ url: record.url, active: true });
-  await saveDashboardState({
-    ...state,
-    staged: state.staged.filter((item) => item.id !== stagedId)
-  });
 }
 
 async function deleteStaged(stagedId: string): Promise<void> {
@@ -193,10 +220,12 @@ async function deleteStaged(stagedId: string): Promise<void> {
 }
 
 async function deleteStagedItems(stagedIds: string[]): Promise<void> {
-  const state = await getDashboardState();
-  await saveDashboardState({
-    ...state,
-    staged: state.staged.filter((item) => !stagedIds.includes(item.id))
+  await mutateDashboardState(async () => {
+    const state = await getDashboardState();
+    await saveDashboardState({
+      ...state,
+      staged: state.staged.filter((item) => !stagedIds.includes(item.id))
+    });
   });
 }
 
@@ -254,4 +283,13 @@ function toStoredTab(
 
 function getStoredActivationTimestamps(tab: StoredTab | undefined): number[] {
   return Array.isArray(tab?.activationTimestamps) ? tab.activationTimestamps : [];
+}
+
+function mutateDashboardState<T>(mutation: () => Promise<T>): Promise<T> {
+  const result = dashboardStateWriteQueue.then(mutation, mutation);
+  dashboardStateWriteQueue = result.then(
+    () => undefined,
+    () => undefined
+  );
+  return result;
 }
