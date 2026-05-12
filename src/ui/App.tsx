@@ -23,7 +23,7 @@ type Theme = 'light' | 'dark';
 const labels = {
   zh: {
     searchAria: '搜索标签页和暂存项',
-    searchPlaceholder: '搜索标签页和暂存项',
+    searchPlaceholder: 'Search tabs',
     themeLabel: '主题',
     switchToDark: '切换到深色模式',
     switchToLight: '切换到浅色模式',
@@ -60,7 +60,7 @@ const labels = {
   },
   en: {
     searchAria: 'Search tabs and staged items',
-    searchPlaceholder: 'Search tabs and staged',
+    searchPlaceholder: 'Search tabs',
     themeLabel: 'Theme',
     switchToDark: 'Switch to dark mode',
     switchToLight: 'Switch to light mode',
