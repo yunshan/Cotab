@@ -44,6 +44,7 @@ const labels = {
     historyDetail: '搜索 Chrome 历史记录中未出现在活跃和暂存里的网页。',
     historyEmpty: '没有新的历史记录匹配当前搜索。',
     historyLoading: '正在搜索历史记录...',
+    historyRestoreTip: '恢复历史记录',
     tabFocused: '已跳转到标签页',
     tabsStaged: (count: number) => `${count} 个标签页已暂存`,
     tabsClosed: (count: number) => `${count} 个标签页已关闭`,
@@ -83,6 +84,7 @@ const labels = {
     historyDetail: 'Chrome history results not already shown in Active or Staged.',
     historyEmpty: 'No new history result matches that search.',
     historyLoading: 'Searching history...',
+    historyRestoreTip: 'Restore history result',
     tabFocused: 'Tab focused',
     tabsStaged: (count: number) => `${count} tab${count === 1 ? '' : 's'} staged`,
     tabsClosed: (count: number) => `${count} tab${count === 1 ? '' : 's'} closed`,
@@ -744,7 +746,8 @@ export function App() {
               }
               records={isHistoryLoading ? [] : historyResults}
               labels={{
-                visits: text.visits as string
+                visits: text.visits as string,
+                restoreTip: text.historyRestoreTip as string
               }}
               onOpen={(record) =>
                 runMessage(
@@ -1034,6 +1037,7 @@ function HistoryList({
   emptyText: string;
   labels: {
     visits: string;
+    restoreTip: string;
   };
   onOpen: (record: HistoryRecord) => void;
 }) {
@@ -1054,6 +1058,16 @@ function HistoryList({
                 </span>
               </div>
               <span className="time-label">{formatRelativeTime(record.lastVisitTime)}</span>
+              <div className="row-actions">
+                <button
+                  className="icon-action"
+                  aria-label={labels.restoreTip}
+                  data-tip={labels.restoreTip}
+                  onClick={() => onOpen(record)}
+                >
+                  <RestoreIcon />
+                </button>
+              </div>
             </div>
           ))}
         </div>
