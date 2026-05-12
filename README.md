@@ -19,13 +19,14 @@ If your browser regularly grows into dozens or hundreds of tabs, closing them ca
 - **Consistent favicons**: Cotab prefers each site's normal favicon so discarded Chrome tabs do not appear as washed-out duplicates.
 - **Bilingual interface**: Chinese and English modes, defaulting to the browser or system language.
 - **Light and dark themes**: quiet theme controls with local preference storage.
+- **Design theme switcher**: choose from every imported `themes/*/DESIGN.md` reference.
 - **Private by default**: no account, no backend, no page snapshots, and no full-history sync or upload.
 
 ## Current Extension Info
 
 - **Name**: Cotab
 - **Manifest**: Chrome Extension Manifest V3
-- **Version**: `1.1.0`
+- **Version**: `1.3.0`
 - **New tab override**: yes
 - **Permissions**: `tabs`, `storage`, `favicon`, `history`
 - **Local data**: tab metadata and staged items in `chrome.storage.local`
@@ -153,6 +154,7 @@ src/lib/               tab rules, storage, message types
 src/ui/                React new-tab dashboard
 icons/                 source extension icons
 release-notes.md       release history
+themes/                imported DESIGN.md theme references
 ```
 
 ## License

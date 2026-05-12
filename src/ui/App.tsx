@@ -15,6 +15,7 @@ import {
   type StoredTab
 } from '../lib/types';
 import { getDefaultLanguage, type Language } from './preferences';
+import { DESIGN_THEMES, getSavedDesignTheme, type DesignThemeId } from './themes';
 import { truncateTitle } from './text';
 
 type Theme = 'light' | 'dark';
@@ -23,6 +24,7 @@ const labels = {
   zh: {
     searchAria: '搜索标签页和暂存项',
     searchPlaceholder: '搜索标签页和暂存项',
+    themeLabel: '主题',
     switchToDark: '切换到深色模式',
     switchToLight: '切换到浅色模式',
     switchLanguage: 'Switch to English',
@@ -59,6 +61,7 @@ const labels = {
   en: {
     searchAria: 'Search tabs and staged items',
     searchPlaceholder: 'Search tabs and staged',
+    themeLabel: 'Theme',
     switchToDark: 'Switch to dark mode',
     switchToLight: 'Switch to light mode',
     switchLanguage: '切换到中文',
@@ -302,15 +305,21 @@ export function App() {
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const [status, setStatus] = useState('Ready');
+  const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>(() => {
     return globalThis.localStorage?.getItem('cotab-theme') === 'dark' ? 'dark' : 'light';
   });
+  const [designTheme, setDesignTheme] = useState<DesignThemeId>(() =>
+    getSavedDesignTheme(globalThis.localStorage)
+  );
   const [language, setLanguage] = useState<Language>(() =>
     getDefaultLanguage(globalThis.localStorage, globalThis.navigator?.languages, globalThis.navigator?.language)
   );
   const [quote] = useState(() => quotes[Math.floor(Math.random() * quotes.length)]);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const themePickerRef = useRef<HTMLDivElement>(null);
   const text = labels[language];
+  const selectedDesignTheme = DESIGN_THEMES.find((item) => item.id === designTheme) ?? DESIGN_THEMES[0];
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -318,8 +327,37 @@ export function App() {
   }, [theme]);
 
   useEffect(() => {
+    document.documentElement.dataset.designTheme = designTheme;
+    globalThis.localStorage?.setItem('cotab-design-theme', designTheme);
+  }, [designTheme]);
+
+  useEffect(() => {
     document.documentElement.lang = language === 'zh' ? 'zh-CN' : 'en';
   }, [language]);
+
+  useEffect(() => {
+    if (!isThemeMenuOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!themePickerRef.current?.contains(event.target as Node)) {
+        setIsThemeMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsThemeMenuOpen(false);
+      }
+    };
+
+    window.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isThemeMenuOpen]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -455,6 +493,43 @@ export function App() {
           <span>Cotab</span>
         </div>
         <div className="nav-actions">
+          <div className="theme-picker" ref={themePickerRef}>
+            <button
+              type="button"
+              className="theme-picker-trigger"
+              aria-haspopup="listbox"
+              aria-expanded={isThemeMenuOpen}
+              aria-label={text.themeLabel as string}
+              onClick={() => setIsThemeMenuOpen((value) => !value)}
+            >
+              <span className="theme-picker-icon" aria-hidden="true">
+                <PaletteIcon />
+              </span>
+              <span className="theme-picker-display">
+                {selectedDesignTheme.name}
+                <ChevronDownIcon />
+              </span>
+            </button>
+            {isThemeMenuOpen ? (
+              <div className="theme-menu" role="listbox" aria-label={text.themeLabel as string}>
+                {DESIGN_THEMES.map((item) => (
+                  <button
+                    type="button"
+                    className="theme-menu-item"
+                    aria-selected={item.id === designTheme}
+                    key={item.id}
+                    role="option"
+                    onClick={() => {
+                      setDesignTheme(item.id);
+                      setIsThemeMenuOpen(false);
+                    }}
+                  >
+                    {item.name}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
           <label className="inline-search" aria-label={text.searchAria as string}>
             <SearchIcon />
             <input
@@ -614,6 +689,41 @@ export function App() {
         <span>by yunshan</span>
       </footer>
     </main>
+  );
+}
+
+function PaletteIcon() {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true">
+      <path
+        d="M10 3.2a6.8 6.8 0 0 0-2.1 13.3c.7.2 1.2-.4 1.2-1v-.7c0-.7.6-1.3 1.3-1.3h1.2a5.2 5.2 0 0 0 5.2-5.2c0-2.8-3-5.1-6.8-5.1Z"
+        fill="none"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M6.8 8h.1M8.8 5.9h.1M11.5 5.8h.1M13.7 7.8h.1"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="2"
+      />
+    </svg>
+  );
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true">
+      <path
+        d="m5.8 7.6 4.2 4.2 4.2-4.2"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.7"
+      />
+    </svg>
   );
 }
 

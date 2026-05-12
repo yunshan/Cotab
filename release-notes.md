@@ -1,5 +1,24 @@
 # Cotab Release Notes
 
+## v1.3.0 - 2026-05-12
+
+This release expands Cotab's design theme picker to cover every imported theme reference.
+
+- Added all `themes/*/DESIGN.md` entries to the UI theme list, expanding from 10 to 23 selectable themes.
+- Added theme options for Airbnb, Airtable, Apple, Coinbase, Cursor, Figma, Framer, Lovable, Notion, Spotify, Stripe, Supabase, and Vercel Inspired.
+- Added base CSS token mappings for the newly imported themes.
+- Updated theme tests to verify every listed theme has a matching `themes/<id>/DESIGN.md` file.
+
+## v1.2.0 - 2026-05-12
+
+This release adds a design-theme layer to Cotab's new tab workspace.
+
+- Added a theme selector to the left of search, with Claude as the default option.
+- Added ten theme entries under `themes/`, sourced from getdesign.md's public design-md collection order.
+- Added runtime theme switching with local preference storage via `cotab-design-theme`.
+- Added CSS token mappings for Claude, Cohere, ElevenLabs, Minimax, Mistral AI, Ollama, OpenCode AI, Replicate, RunwayML, and Together AI.
+- Added tests for default theme selection, persisted theme loading, unsupported theme fallback, and theme list size.
+
 ## v1.1.0 - 2026-05-11
 
 This release makes Active ranking more current and easier to understand.
