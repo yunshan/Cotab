@@ -373,6 +373,11 @@ export function App() {
         target?.tagName === 'TEXTAREA' ||
         target?.isContentEditable;
 
+      if (event.key === 'Escape') {
+        setSelectedActiveIds(new Set());
+        setSelectedStagedIds(new Set());
+      }
+
       if (event.key === '/' && !isTyping) {
         event.preventDefault();
         searchInputRef.current?.focus();
