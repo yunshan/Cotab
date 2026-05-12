@@ -1,5 +1,15 @@
 # Cotab Release Notes
 
+## v1.5.0 - 2026-05-12
+
+This release makes batch tab cleanup more deliberate.
+
+- Added checkboxes to each Active and Staged row.
+- Highlighted selected rows so pending batch actions are visible before closing.
+- Replaced `Close all` actions with `Close selected N tabs` actions.
+- Active batch close now closes only selected open tabs.
+- Staged batch close now removes only selected staged records.
+
 ## v1.4.0 - 2026-05-12
 
 This release fixes recent tab activation counting reliability.

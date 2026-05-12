@@ -645,6 +645,15 @@ h1 {
   color: var(--error);
 }
 
+.close-all-button.is-selected-action {
+  color: var(--primary-active);
+}
+
+.close-all-button.is-selected-action:hover:not(:disabled) {
+  background: rgba(204, 120, 92, 0.12);
+  color: var(--primary-active);
+}
+
 .close-all-button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
@@ -831,7 +840,7 @@ h1 {
 .tab-row {
   position: relative;
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) max-content max-content;
+  grid-template-columns: 18px 24px minmax(0, 1fr) max-content max-content;
   gap: 10px;
   align-items: center;
   min-height: 42px;
@@ -851,8 +860,16 @@ h1 {
   background: rgba(204, 120, 92, 0.08);
 }
 
+.tab-row.is-selected {
+  background: rgba(204, 120, 92, 0.12);
+}
+
 .staged-section .tab-row:hover {
   background: rgba(255, 255, 255, 0.72);
+}
+
+.staged-section .tab-row.is-selected {
+  background: rgba(204, 120, 92, 0.09);
 }
 
 :root[data-theme='dark'] .tab-row:hover,
@@ -860,8 +877,13 @@ h1 {
   background: rgba(204, 120, 92, 0.13);
 }
 
+:root[data-theme='dark'] .tab-row.is-selected,
+:root[data-theme='dark'] .staged-section .tab-row.is-selected {
+  background: rgba(204, 120, 92, 0.2);
+}
+
 .staged-row {
-  grid-template-columns: 24px minmax(0, 1fr) max-content max-content;
+  grid-template-columns: 18px 24px minmax(0, 1fr) max-content max-content;
 }
 
 .history-block {
@@ -876,6 +898,14 @@ h1 {
 
 .history-row {
   grid-template-columns: 24px minmax(0, 1fr) max-content;
+}
+
+.row-checkbox {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--primary);
+  cursor: pointer;
 }
 
 .favicon {
@@ -1188,13 +1218,20 @@ h1 {
   }
 
   .tab-row,
-  .staged-row,
+  .staged-row {
+    grid-template-columns: 18px 24px minmax(0, 1fr);
+  }
+
   .history-row {
     grid-template-columns: 24px minmax(0, 1fr);
   }
 
-  .time-label,
-  .row-actions {
+  .tab-row .time-label,
+  .tab-row .row-actions {
+    grid-column: 3;
+  }
+
+  .history-row .time-label {
     grid-column: 2;
   }
 

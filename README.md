@@ -13,6 +13,7 @@ If your browser regularly grows into dozens or hundreds of tabs, closing them ca
 - **Active tabs by recent usage**: open tabs are ranked by activation count from the last 24 hours, so currently useful pages rise naturally.
 - **Stage instead of hoard**: store a tab for later use and close the original tab in one click.
 - **Close without ceremony**: close individual tabs or bulk-close the currently visible Active list.
+- **Select before closing**: choose multiple Active or Staged rows and close only the selected items.
 - **Focused two-pane layout**: Active takes the main workspace, while Staged sits beside it as a temporary holding area.
 - **Search as you type**: filter Active and Staged tabs by title, URL, or domain.
 - **History search when needed**: while searching, Cotab can surface matching Chrome history results that are not already visible in Active or Staged.
@@ -26,7 +27,7 @@ If your browser regularly grows into dozens or hundreds of tabs, closing them ca
 
 - **Name**: Cotab
 - **Manifest**: Chrome Extension Manifest V3
-- **Version**: `1.3.0`
+- **Version**: `1.5.0`
 - **New tab override**: yes
 - **Permissions**: `tabs`, `storage`, `favicon`, `history`
 - **Local data**: tab metadata and staged items in `chrome.storage.local`

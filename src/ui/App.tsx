@@ -30,11 +30,13 @@ const labels = {
     switchLanguage: 'Switch to English',
     active: '活跃',
     activeCloseAll: (count: number) => `× 关闭全部 ${count} 个标签页`,
+    activeCloseSelected: (count: number) => `× 关闭选中的 ${count} 个标签页`,
     activeDetail: '按最近 24 小时激活次数排序的打开标签页。',
     activeEmpty: '当前还没有被追踪的网页标签页。',
     activeEmptySearch: '没有匹配搜索的活跃标签页。',
     staged: '暂存',
     stagedCloseAll: (count: number) => `× 关闭全部 ${count} 个标签页`,
+    stagedCloseSelected: (count: number) => `× 关闭选中的 ${count} 个标签页`,
     stagedDetail: '临时存放，供后续处理。',
     stagedEmpty: 'Stage 后的标签页会出现在这里。',
     stagedEmptySearch: '没有匹配搜索的暂存项。',
@@ -67,11 +69,13 @@ const labels = {
     switchLanguage: '切换到中文',
     active: 'Active',
     activeCloseAll: (count: number) => `× Close all ${count} tabs`,
+    activeCloseSelected: (count: number) => `× Close selected ${count} tabs`,
     activeDetail: 'Open tabs ranked by activations in the last 24 hours.',
     activeEmpty: 'No active web tabs are being tracked yet.',
     activeEmptySearch: 'No active tab matches that search.',
     staged: 'Staged',
     stagedCloseAll: (count: number) => `× Close all ${count} tabs`,
+    stagedCloseSelected: (count: number) => `× Close selected ${count} tabs`,
     stagedDetail: 'Temporarily stored links for later use.',
     stagedEmpty: 'Staged tabs will appear here.',
     stagedEmptySearch: 'No staged item matches that search.',
@@ -306,6 +310,8 @@ export function App() {
   const [isBusy, setIsBusy] = useState(false);
   const [status, setStatus] = useState('Ready');
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
+  const [selectedActiveIds, setSelectedActiveIds] = useState<Set<number>>(() => new Set());
+  const [selectedStagedIds, setSelectedStagedIds] = useState<Set<string>>(() => new Set());
   const [theme, setTheme] = useState<Theme>(() => {
     return globalThis.localStorage?.getItem('cotab-theme') === 'dark' ? 'dark' : 'light';
   });
@@ -401,10 +407,24 @@ export function App() {
     () => searchStaged(state.staged, query),
     [query, state.staged]
   );
+  const selectedActiveTabIds = useMemo(() => {
+    const existingIds = new Set(activeTabsRaw.map((tab) => tab.tabId));
+    return Array.from(selectedActiveIds).filter((tabId) => existingIds.has(tabId));
+  }, [activeTabsRaw, selectedActiveIds]);
+  const selectedStagedItemIds = useMemo(() => {
+    const existingIds = new Set(state.staged.map((record) => record.id));
+    return Array.from(selectedStagedIds).filter((stagedId) => existingIds.has(stagedId));
+  }, [selectedStagedIds, state.staged]);
   const excludedHistoryUrls = useMemo(
     () => [...activeTabsRaw.map((tab) => tab.url), ...state.staged.map((record) => record.url)],
     [activeTabsRaw, state.staged]
   );
+  const activeCloseTargetIds = selectedActiveTabIds.length
+    ? selectedActiveTabIds
+    : activeTabs.map((tab) => tab.tabId);
+  const stagedCloseTargetIds = selectedStagedItemIds.length
+    ? selectedStagedItemIds
+    : stagedResults.map((record) => record.id);
 
   useEffect(() => {
     const normalized = query.trim();
@@ -446,6 +466,16 @@ export function App() {
     };
   }, [excludedHistoryUrls, query]);
 
+  useEffect(() => {
+    const existingIds = new Set(activeTabsRaw.map((tab) => tab.tabId));
+    setSelectedActiveIds((current) => new Set(Array.from(current).filter((tabId) => existingIds.has(tabId))));
+  }, [activeTabsRaw]);
+
+  useEffect(() => {
+    const existingIds = new Set(state.staged.map((record) => record.id));
+    setSelectedStagedIds((current) => new Set(Array.from(current).filter((stagedId) => existingIds.has(stagedId))));
+  }, [state.staged]);
+
   async function stageTabs(tabIds: number[]) {
     if (!tabIds.length) {
       return;
@@ -470,6 +500,11 @@ export function App() {
       setStatus,
       (text.tabsClosed as (count: number) => string)(tabIds.length)
     );
+    setSelectedActiveIds((current) => {
+      const next = new Set(current);
+      tabIds.forEach((tabId) => next.delete(tabId));
+      return next;
+    });
   }
 
   async function deleteStagedItems(stagedIds: string[]) {
@@ -483,6 +518,35 @@ export function App() {
       setStatus,
       text.stagedRemoved as string
     );
+    setSelectedStagedIds((current) => {
+      const next = new Set(current);
+      stagedIds.forEach((stagedId) => next.delete(stagedId));
+      return next;
+    });
+  }
+
+  function toggleActiveSelection(tabId: number) {
+    setSelectedActiveIds((current) => {
+      const next = new Set(current);
+      if (next.has(tabId)) {
+        next.delete(tabId);
+      } else {
+        next.add(tabId);
+      }
+      return next;
+    });
+  }
+
+  function toggleStagedSelection(stagedId: string) {
+    setSelectedStagedIds((current) => {
+      const next = new Set(current);
+      if (next.has(stagedId)) {
+        next.delete(stagedId);
+      } else {
+        next.add(stagedId);
+      }
+      return next;
+    });
   }
 
   return (
@@ -587,17 +651,20 @@ export function App() {
             detail={text.activeDetail as string}
             action={
               <button
-                className="close-all-button"
-                disabled={isBusy || activeTabs.length === 0}
-                onClick={() => closeTabs(activeTabs.map((tab) => tab.tabId))}
+                className={selectedActiveTabIds.length ? 'close-all-button is-selected-action' : 'close-all-button'}
+                disabled={isBusy || activeCloseTargetIds.length === 0}
+                onClick={() => closeTabs(activeCloseTargetIds)}
               >
-                {(text.activeCloseAll as (count: number) => string)(activeTabs.length)}
+                {selectedActiveTabIds.length
+                  ? (text.activeCloseSelected as (count: number) => string)(selectedActiveTabIds.length)
+                  : (text.activeCloseAll as (count: number) => string)(activeTabs.length)}
               </button>
             }
           />
           <TabList
             emptyText={(query ? text.activeEmptySearch : text.activeEmpty) as string}
             tabs={activeTabs}
+            selectedIds={selectedActiveIds}
             labels={{
               activations: text.activations as string,
               activationTip: text.activationTip as string,
@@ -614,6 +681,7 @@ export function App() {
             }
             onStage={(tab) => stageTabs([tab.tabId])}
             onClose={(tab) => closeTabs([tab.tabId])}
+            onToggleSelection={(tab) => toggleActiveSelection(tab.tabId)}
           />
         </section>
 
@@ -624,17 +692,20 @@ export function App() {
             detail={text.stagedDetail as string}
             action={
               <button
-                className="close-all-button"
-                disabled={isBusy || stagedResults.length === 0}
-                onClick={() => deleteStagedItems(stagedResults.map((record) => record.id))}
+                className={selectedStagedItemIds.length ? 'close-all-button is-selected-action' : 'close-all-button'}
+                disabled={isBusy || stagedCloseTargetIds.length === 0}
+                onClick={() => deleteStagedItems(stagedCloseTargetIds)}
               >
-                {(text.stagedCloseAll as (count: number) => string)(stagedResults.length)}
+                {selectedStagedItemIds.length
+                  ? (text.stagedCloseSelected as (count: number) => string)(selectedStagedItemIds.length)
+                  : (text.stagedCloseAll as (count: number) => string)(stagedResults.length)}
               </button>
             }
           />
           <StagedList
             emptyText={(query ? text.stagedEmptySearch : text.stagedEmpty) as string}
             records={stagedResults}
+            selectedIds={selectedStagedIds}
             labels={{
               restoreTip: text.restoreTip as string,
               removeTip: text.removeTip as string
@@ -655,6 +726,7 @@ export function App() {
                 text.stagedRemoved as string
               )
             }
+            onToggleSelection={(record) => toggleStagedSelection(record.id)}
           />
 
           {query.trim() ? (
@@ -794,13 +866,16 @@ function SectionHeader({
 
 function TabList({
   tabs,
+  selectedIds,
   emptyText,
   labels,
   onTitleClick,
   onStage,
-  onClose
+  onClose,
+  onToggleSelection
 }: {
   tabs: StoredTab[];
+  selectedIds: Set<number>;
   emptyText: string;
   labels: {
     activations: string;
@@ -811,6 +886,7 @@ function TabList({
   onTitleClick: (tab: StoredTab) => void;
   onStage: (tab: StoredTab) => void;
   onClose: (tab: StoredTab) => void;
+  onToggleSelection: (tab: StoredTab) => void;
 }) {
   if (!tabs.length) {
     return <p className="empty-state">{emptyText}</p>;
@@ -818,53 +894,66 @@ function TabList({
 
   return (
     <div className="tab-list">
-      {tabs.map((tab) => (
-        <div className="tab-row" key={tab.tabId}>
-          <Favicon src={tab.favIconUrl} url={tab.url} domain={tab.domain} />
-          <div className="row-copy">
-            <button className="title-link" onClick={() => onTitleClick(tab)}>
-              {truncateTitle(tab.title)}
-            </button>
-            <span>
-              {tab.domain} ·{' '}
-              <span className="activation-count" title={labels.activationTip}>
-                {tab.activationCount} {labels.activations}
+      {tabs.map((tab) => {
+        const isSelected = selectedIds.has(tab.tabId);
+        return (
+          <div className={isSelected ? 'tab-row is-selected' : 'tab-row'} key={tab.tabId}>
+            <input
+              className="row-checkbox"
+              type="checkbox"
+              checked={isSelected}
+              aria-label={`Select ${tab.title}`}
+              onChange={() => onToggleSelection(tab)}
+            />
+            <Favicon src={tab.favIconUrl} url={tab.url} domain={tab.domain} />
+            <div className="row-copy">
+              <button className="title-link" onClick={() => onTitleClick(tab)}>
+                {truncateTitle(tab.title)}
+              </button>
+              <span>
+                {tab.domain} ·{' '}
+                <span className="activation-count" title={labels.activationTip}>
+                  {tab.activationCount} {labels.activations}
+                </span>
               </span>
-            </span>
+            </div>
+            <span className="time-label">{formatRelativeTime(tab.lastAccessedAt)}</span>
+            <div className="row-actions">
+              <button
+                className="icon-action"
+                aria-label={labels.storeTip}
+                data-tip={labels.storeTip}
+                onClick={() => onStage(tab)}
+              >
+                <StageIcon />
+              </button>
+              <button
+                className="icon-action danger"
+                aria-label={labels.closeTip}
+                data-tip={labels.closeTip}
+                onClick={() => onClose(tab)}
+              >
+                <CloseIcon />
+              </button>
+            </div>
           </div>
-          <span className="time-label">{formatRelativeTime(tab.lastAccessedAt)}</span>
-          <div className="row-actions">
-            <button
-              className="icon-action"
-              aria-label={labels.storeTip}
-              data-tip={labels.storeTip}
-              onClick={() => onStage(tab)}
-            >
-              <StageIcon />
-            </button>
-            <button
-              className="icon-action danger"
-              aria-label={labels.closeTip}
-              data-tip={labels.closeTip}
-              onClick={() => onClose(tab)}
-            >
-              <CloseIcon />
-            </button>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
 
 function StagedList({
   records,
+  selectedIds,
   emptyText,
   labels,
   onRestore,
-  onDelete
+  onDelete,
+  onToggleSelection
 }: {
   records: StagedRecord[];
+  selectedIds: Set<string>;
   emptyText: string;
   labels: {
     restoreTip: string;
@@ -872,6 +961,7 @@ function StagedList({
   };
   onRestore: (record: StagedRecord) => void;
   onDelete: (record: StagedRecord) => void;
+  onToggleSelection: (record: StagedRecord) => void;
 }) {
   if (!records.length) {
     return <p className="empty-state">{emptyText}</p>;
@@ -879,36 +969,46 @@ function StagedList({
 
   return (
     <div className="tab-list">
-      {records.map((record) => (
-        <div className="tab-row staged-row" key={record.id}>
-          <Favicon src={record.favIconUrl} url={record.url} domain={record.domain} />
-          <div className="row-copy">
-            <button className="title-link" onClick={() => onRestore(record)}>
-              {truncateTitle(record.title)}
-            </button>
-            <span>{record.domain}</span>
+      {records.map((record) => {
+        const isSelected = selectedIds.has(record.id);
+        return (
+          <div className={isSelected ? 'tab-row staged-row is-selected' : 'tab-row staged-row'} key={record.id}>
+            <input
+              className="row-checkbox"
+              type="checkbox"
+              checked={isSelected}
+              aria-label={`Select ${record.title}`}
+              onChange={() => onToggleSelection(record)}
+            />
+            <Favicon src={record.favIconUrl} url={record.url} domain={record.domain} />
+            <div className="row-copy">
+              <button className="title-link" onClick={() => onRestore(record)}>
+                {truncateTitle(record.title)}
+              </button>
+              <span>{record.domain}</span>
+            </div>
+            <span className="time-label">{formatRelativeTime(record.stagedAt)}</span>
+            <div className="row-actions">
+              <button
+                className="icon-action"
+                aria-label={labels.restoreTip}
+                data-tip={labels.restoreTip}
+                onClick={() => onRestore(record)}
+              >
+                <RestoreIcon />
+              </button>
+              <button
+                className="icon-action danger"
+                aria-label={labels.removeTip}
+                data-tip={labels.removeTip}
+                onClick={() => onDelete(record)}
+              >
+                <CloseIcon />
+              </button>
+            </div>
           </div>
-          <span className="time-label">{formatRelativeTime(record.stagedAt)}</span>
-          <div className="row-actions">
-            <button
-              className="icon-action"
-              aria-label={labels.restoreTip}
-              data-tip={labels.restoreTip}
-              onClick={() => onRestore(record)}
-            >
-              <RestoreIcon />
-            </button>
-            <button
-              className="icon-action danger"
-              aria-label={labels.removeTip}
-              data-tip={labels.removeTip}
-              onClick={() => onDelete(record)}
-            >
-              <CloseIcon />
-            </button>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
