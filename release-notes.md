@@ -2,13 +2,18 @@
 
 ## v1.5.0 - 2026-05-12
 
-This release makes batch tab cleanup more deliberate.
+This release makes Cotab's search, selection, and dark-mode experience feel more complete and deliberate.
 
 - Added checkboxes to each Active and Staged row.
 - Highlighted selected rows so pending batch actions are visible before closing.
-- Replaced `Close all` actions with `Close selected N tabs` actions.
-- Active batch close now closes only selected open tabs.
-- Staged batch close now removes only selected staged records.
+- Kept the original `× Close all N tabs` behavior when nothing is selected, and switches to highlighted `× Close selected N tabs` actions only after the user selects rows.
+- Added `Esc` keyboard support to clear all selected Active and Staged rows at once.
+- Active batch close now closes only selected open tabs when rows are selected, otherwise it closes the currently visible Active tabs.
+- Staged batch close now removes only selected staged records when rows are selected, otherwise it removes the currently visible Staged records.
+- Added a Restore action icon to History search results, matching the Staged restore interaction.
+- Changed the search placeholder to `Search tabs`.
+- Improved dark-mode support across imported design themes with shared dark tokens, so non-Claude themes no longer remain effectively light.
+- Restyled row checkboxes for dark mode so selected and unselected states stay calm and readable.
 
 ## v1.4.0 - 2026-05-12
 
